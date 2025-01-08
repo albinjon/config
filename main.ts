@@ -1,13 +1,22 @@
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
-import { ConfigDao, ConfigPair } from "./config-dao.ts";
-import { AuthDao } from "./auth-dao.ts";
-import { Credentials } from "./auth-dao.ts";
+import { cors } from "hono/cors";
+import { Config, ConfigPair } from "./config.ts";
+import { Auth } from "./auth.ts";
+import { Credentials } from "./auth.ts";
+import { Dao } from "./dao.ts";
 
 const app = new Hono();
-const config = new ConfigDao();
-const auth = new AuthDao();
+const dao = new Dao();
+const config = new Config(dao);
+const auth = new Auth(dao);
 
+app.use(
+  "/api/*",
+  cors({
+    origin: ["http://localhost:8081"],
+  }),
+);
 app.post("/api/auth", async (c) => {
   const body = await c.req.json();
   const credentials: Credentials = {
@@ -24,20 +33,21 @@ app.get("/api/sessions", (c) => {
   return c.json(res);
 });
 
-app.use(
-  "/api/config/*",
-  basicAuth({
-    invalidUserMessage: "YOU SHALL NOT PASS",
-    verifyUser: (_, __, c) => {
-      const token = c.req.header("Authorization");
-      if (!token) return false;
-      return auth.validate(token);
-    },
-  }),
-);
+// app.use(
+//   "/api/config/*",
+//   basicAuth({
+//     invalidUserMessage: "YOU SHALL NOT PASS",
+//     verifyUser: (_, __, c) => {
+//       const token = c.req.header("Authorization");
+//       if (!token) return false;
+//       return auth.validate(token);
+//     },
+//   }),
+// );
 
 app.get("/api/config/all", (c) => {
   const pairs = config.getConfig();
+  console.log(pairs);
   return c.json(pairs);
 });
 
@@ -58,7 +68,17 @@ app.post("/api/config", async (c) => {
     value: body.value as string,
   };
   config.setConfig(configPair);
-  return c.status(201);
+  c.status(201);
+  const pairs = config.getConfig();
+  return c.json(pairs);
 });
 
 Deno.serve({ port: 3232 }, app.fetch);
+
+globalThis.addEventListener("unload", () => {
+  dao.close();
+});
+
+Deno.addSignalListener("SIGINT", () => {
+  Deno.exit();
+});

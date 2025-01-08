@@ -26,7 +26,7 @@ export function initDb(db: Database) {
     `
 	CREATE TABLE IF NOT EXISTS config (
 	  id INTEGER PRIMARY KEY AUTOINCREMENT,
-	  key TEXT,
+	  key TEXT UNIQUE,
 	  value TEXT
 	);
   `,
