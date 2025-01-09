@@ -23,13 +23,28 @@ app.post("/api/auth", async (c) => {
     username: body.username as string,
     password: body.password as string,
   };
-  const result = auth.authenticate(credentials);
-  console.log(result);
-  return c.status(201);
+  const result = await auth.authenticate(credentials);
+  return c.json({ token: result });
+});
+
+app.post("/api/create-user", async (c) => {
+  const body = await c.req.json();
+  const credentials: Credentials = {
+    username: body.username as string,
+    password: body.password as string,
+  };
+  await auth.createUser(credentials);
+  return c.text("OK");
 });
 
 app.get("/api/sessions", (c) => {
   const res = auth.getSessions();
+  return c.json(res);
+});
+
+app.get("/api/validate/:sessionId", async (c) => {
+  const id = c.req.param("sessionId");
+  const res = await auth.validate(id);
   return c.json(res);
 });
 

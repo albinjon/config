@@ -6,7 +6,19 @@ export interface Credentials {
   password: string;
 }
 
-// INFO: For long lived access tokens, the expiry time is three months,
+export interface Session {
+  id: string;
+  userId: number;
+  expiryTimestamp: number;
+  longLived: boolean;
+}
+
+export interface User {
+  id: number;
+  username: string;
+}
+
+export // INFO: For long lived access tokens, the expiry time is three months,
 // if they are used, then they will be refreshed, otherwise one will have
 // to create new ones.
 const ONE_MONTH_IN_MS = 604_800_000 * 4;
@@ -18,32 +30,47 @@ export class Auth {
     this.dao = dao;
   }
 
-  public validate(token: string) {
-    const expiry = this.dao.getSessionExpiry(token);
-    if (!expiry) return false;
-    const hasExpired = Date.now() > expiry?.timestamp;
+  public async validate(token: string) {
+    const sessionId = await this.hashSessionToken(token);
+    const row = this.dao.getSession(sessionId);
+    if (!row) return false;
+    const { user, session } = row;
+    const hasExpired = Date.now() > session.expiryTimestamp;
     if (hasExpired) return false;
-    if (expiry.timestamp < Date.now() + ONE_MONTH_IN_MS) {
+    if (session.expiryTimestamp - Date.now() < ONE_MONTH_IN_MS / 2) {
       console.log("updating token");
-      this.dao.updateSessionToken(token);
+      const updatedExpiry = Date.now() + ONE_MONTH_IN_MS;
+      console.log(updatedExpiry);
+      this.dao.updateSessionToken(sessionId, updatedExpiry);
     }
-    return true;
+    return { user, session };
   }
 
   public getSessions() {
     return this.dao.getSessions();
   }
 
-  private createSession(longLived?: boolean) {
+  private async createSession(userId: number, longLived?: boolean) {
     const expiryTime = longLived
       ? LONG_LIVED_AT_EXPIRATION_TIME
       : ONE_MONTH_IN_MS;
     const timestamp = Date.now();
     const expiryTimestamp = timestamp + expiryTime;
     const sessionToken = crypto.randomUUID();
-    this.dao.deleteExpiredSessions();
-    this.dao.createSession(sessionToken, expiryTimestamp);
+    const sessionId = await this.hashSessionToken(sessionToken);
+    console.log(sessionId);
+    this.dao.createSession(userId, sessionId, expiryTimestamp);
     return sessionToken;
+  }
+
+  private async hashSessionToken(sessionToken: string) {
+    const buffer = new TextEncoder().encode(sessionToken);
+    const hashBuffer = await crypto.subtle.digest({ name: "sha-256" }, buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
+    const hashHex = hashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return hashHex;
   }
 
   public async createUser(credentials: Credentials) {
@@ -54,9 +81,8 @@ export class Auth {
 
   public authenticate(credentials: Credentials) {
     const { username, password } = credentials;
-    console.log("getting user");
     const result = this.dao.getUser(username);
-    console.log(result);
+    console.log("User result: ", result);
     if (!result) {
       return false;
     }
@@ -64,6 +90,6 @@ export class Auth {
     // if (!matches) {
     //   return false;
     // }
-    return this.createSession();
+    return this.createSession(result.id);
   }
 }

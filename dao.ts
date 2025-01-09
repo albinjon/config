@@ -1,6 +1,7 @@
 import { Database } from "@db/sqlite";
 import { initDb } from "./db.ts";
 import { ConfigPair } from "./config.ts";
+import { Session, User } from "./auth.ts";
 
 export class Dao {
   private db: Database;
@@ -9,10 +10,35 @@ export class Dao {
     initDb(this.db);
   }
 
-  public getSessionExpiry(token: string) {
-    return this.db
-      .prepare("SELECT expiry_timestamp FROM session WHERE token = ?")
-      .get<{ timestamp: number }>(token);
+  public getSession(
+    sessionId: string,
+  ): { user: User; session: Session } | undefined {
+    const result = this.db
+      .prepare(
+        "SELECT session.id AS session_id, session.user_id, session.expiry_timestamp, session.long_lived, user.id, user.username FROM session INNER JOIN user ON user.id = session.user_id WHERE session.id = ?",
+      )
+      .get<{
+        session_id: string;
+        user_id: number;
+        long_lived: boolean;
+        expiry_timestamp: string;
+        username: string;
+      }>(sessionId);
+    if (!result) return;
+    const user: User = {
+      id: result.user_id,
+      username: result.username,
+    };
+    const session: Session = {
+      id: result.session_id,
+      // INFO: The SQLite client library has problems with > 32bit integers,
+      // which effectively overflows the INTEGER, even though it's supposed
+      // to be able to handle 64bit ints. Instead it's now saved as text.
+      expiryTimestamp: Number(result.expiry_timestamp as unknown as string),
+      longLived: Boolean(result.long_lived),
+      userId: result.user_id,
+    };
+    return { user, session };
   }
 
   public getSessions() {
@@ -20,22 +46,22 @@ export class Dao {
     return result;
   }
 
-  public deleteExpiredSessions() {
+  public createSession(
+    userId: number,
+    sessionId: string,
+    expiryTimestamp: number,
+  ) {
     return this.db
-      .prepare("DELETE FROM session WHERE expiry_timestamp < CURRENT_TIMESTAMP")
-      .run();
+      .prepare(
+        "INSERT INTO session (user_id, id, expiry_timestamp) VALUES (?, ?, ?)",
+      )
+      .run(userId, sessionId, expiryTimestamp.toString());
   }
 
-  public createSession(sessionToken: string, expiryTimestamp: number) {
+  public updateSessionToken(sessionId: string, expiryTimestamp: number) {
     return this.db
-      .prepare("INSERT INTO session (token, expiry_timestamp) VALUES (?, ?, ?)")
-      .run(sessionToken, expiryTimestamp);
-  }
-
-  public updateSessionToken(token: string) {
-    return this.db
-      .prepare("UPDATE SET token = (token) FROM sessions (?)")
-      .run(token);
+      .prepare("UPDATE session SET expiry_timestamp = ? WHERE id = ?")
+      .run(expiryTimestamp.toString(), sessionId);
   }
 
   public createUser(username: string, passwordHash: string) {
@@ -47,7 +73,10 @@ export class Dao {
   public getUser(username: string) {
     return this.db
       .prepare("SELECT id, password FROM user WHERE username = ?")
-      .get(username);
+      .get<{
+        id: number;
+        password: string;
+      }>(username);
   }
 
   public setConfig(key: string, value: string) {

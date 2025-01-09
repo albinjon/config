@@ -14,10 +14,10 @@ export function initDb(db: Database) {
   db.prepare(
     `
 	CREATE TABLE IF NOT EXISTS session (
-	  id INTEGER PRIMARY KEY AUTOINCREMENT,
+	  id TEXT NOT NULL PRIMARY KEY,
     long_lived INT DEFAULT FALSE,
-	  token TEXT,
-	  expiry_timestamp DATETIME DEFAULT (datetime('now', '+30 minutes'))
+    user_id INTEGER NOT NULL REFERENCES user(id),
+	  expiry_timestamp TEXT NOT NULL
 	);
   `,
   ).run();
@@ -31,9 +31,4 @@ export function initDb(db: Database) {
 	);
   `,
   ).run();
-
-  db.prepare("INSERT INTO user (username, password) VALUES (?, ?)").run(
-    "albin",
-    "testar",
-  );
 }
