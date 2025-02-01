@@ -65,6 +65,16 @@ app.post("/api/create-user", async (c) => {
   return c.text("OK");
 });
 
+app.post("/api/delete-user", async (c) => {
+  const body = await c.req.json();
+  const credentials: Credentials = {
+    username: body.username as string,
+    password: body.password as string,
+  };
+  await auth.deleteUser(credentials);
+  return c.text("OK");
+});
+
 app.get("/api/sessions", (c) => {
   const res = auth.getSessions();
   return c.json(res);

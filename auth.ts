@@ -27,7 +27,7 @@ export interface TokenResponse {
   token: string;
 }
 
-export // INFO: For long lived access tokens, the expiry time is three months,
+// INFO: For long lived access tokens, the expiry time is three months,
 // if they are used, then they will be refreshed, otherwise one will have
 // to create new ones.
 const ONE_MONTH_IN_MS = 604_800_000 * 4;
@@ -106,5 +106,14 @@ export class Auth {
     const { username, password } = credentials;
     const hash = await bcrypt.hash(password);
     this.dao.createUser(username, hash);
+  }
+
+  public async deleteUser(credentials: Credentials) {
+    const authResult = await this.authenticate(credentials);
+    if (!authResult) throw new Error("Incorrect credentials.");
+    const validationResult = await this.validate(authResult.token);
+    if (!validationResult) throw new Error("Invalid user or token.");
+    const userId = validationResult.user.id;
+    return this.dao.deleteUser(userId);
   }
 }

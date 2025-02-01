@@ -79,6 +79,10 @@ export class Dao {
       }>(username);
   }
 
+  public deleteUser(userId: number) {
+    return this.db.prepare(`DELETE FROM user WHERE id = ?`).run(userId);
+  }
+
   public setConfig(key: string, value: string) {
     this.db
       .prepare(
