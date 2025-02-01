@@ -97,6 +97,10 @@ export class Dao {
     return pair ? [pair] : [];
   }
 
+  public deleteConfig(key: string) {
+    return this.db.prepare(`DELETE FROM config WHERE key = ?`).run(key);
+  }
+
   public getFullConfig() {
     const rows = this.db
       .prepare("SELECT key, value FROM config")

@@ -18,6 +18,15 @@ export interface User {
   username: string;
 }
 
+export interface AuthResponse {
+  user: User;
+  session: Session;
+}
+
+export interface TokenResponse {
+  token: string;
+}
+
 export // INFO: For long lived access tokens, the expiry time is three months,
 // if they are used, then they will be refreshed, otherwise one will have
 // to create new ones.
@@ -30,18 +39,39 @@ export class Auth {
     this.dao = dao;
   }
 
-  public async validate(token: string) {
-    const sessionId = await this.hashSessionToken(token);
-    const row = this.dao.getSession(sessionId);
-    if (!row) return false;
+  public async authenticate(
+    credentials: Credentials,
+  ): Promise<TokenResponse | undefined> {
+    const { username, password } = credentials;
+    const result = this.dao.getUser(username);
+    if (!result) {
+      return;
+    }
+    const matches = await bcrypt.compare(password, result.password);
+    if (!matches) {
+      return;
+    }
+    const token = await this.createSession(result.id);
+    return { token };
+  }
+
+  public async validate(token: string): Promise<AuthResponse | undefined> {
+    const hashedToken = await this.hashSessionToken(token);
+    const row = this.dao.getSession(hashedToken);
+    if (!row) {
+      console.error("Could not find session in table.");
+      return;
+    }
     const { user, session } = row;
     const hasExpired = Date.now() > session.expiryTimestamp;
-    if (hasExpired) return false;
+    if (hasExpired) {
+      console.error("Session has expired.");
+      return;
+    }
     if (session.expiryTimestamp - Date.now() < ONE_MONTH_IN_MS / 2) {
       console.log("updating token");
       const updatedExpiry = Date.now() + ONE_MONTH_IN_MS;
-      console.log(updatedExpiry);
-      this.dao.updateSessionToken(sessionId, updatedExpiry);
+      this.dao.updateSessionToken(token, updatedExpiry);
     }
     return { user, session };
   }
@@ -58,7 +88,6 @@ export class Auth {
     const expiryTimestamp = timestamp + expiryTime;
     const sessionToken = crypto.randomUUID();
     const sessionId = await this.hashSessionToken(sessionToken);
-    console.log(sessionId);
     this.dao.createSession(userId, sessionId, expiryTimestamp);
     return sessionToken;
   }
@@ -77,19 +106,5 @@ export class Auth {
     const { username, password } = credentials;
     const hash = await bcrypt.hash(password);
     this.dao.createUser(username, hash);
-  }
-
-  public authenticate(credentials: Credentials) {
-    const { username, password } = credentials;
-    const result = this.dao.getUser(username);
-    console.log("User result: ", result);
-    if (!result) {
-      return false;
-    }
-    // const matches = await bcrypt.compare(password, result.password);
-    // if (!matches) {
-    //   return false;
-    // }
-    return this.createSession(result.id);
   }
 }

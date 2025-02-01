@@ -18,6 +18,10 @@ export class Config {
     return this.dao.getConfig(key);
   }
 
+  public deleteConfig(key: string) {
+    return this.dao.deleteConfig(key);
+  }
+
   public setConfig(pair: ConfigPair) {
     this.dao.setConfig(pair.key, pair.value);
   }
