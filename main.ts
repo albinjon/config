@@ -20,6 +20,10 @@ app.use(
       "https://configura-sleek.onrender.com",
       "https://config.jonfelt.se",
     ],
+    credentials: true,
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Content-Length", "X-Requested-With"],
   }),
 );
 
