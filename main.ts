@@ -19,10 +19,10 @@ app.use(
     origin: [
       "https://configura-sleek.onrender.com",
       "https://config.jonfelt.se",
-      "http://localhost:5556",
     ],
   }),
 );
+
 app.use(
   "/api/config/*",
   bearerAuth({
@@ -39,7 +39,6 @@ app.use(
     origin: [
       "https://configura-sleek.onrender.com",
       "https://config.jonfelt.se",
-      "http://localhost:5556",
     ],
   }),
 );
