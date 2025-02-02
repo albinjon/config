@@ -7,7 +7,7 @@ export class Dao {
   private db: Database;
   constructor() {
     const isDev = Deno.env.get("MODE") === "dev";
-    this.db = new Database(isDev ? "./config.db" : "/persistence/config.db");
+    this.db = new Database(isDev ? "./config.db" : "/persistent/config.db");
     initDb(this.db);
   }
 
