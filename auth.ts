@@ -86,6 +86,7 @@ export class Auth {
     if (session.expiryTimestamp - Date.now() < ONE_MONTH_IN_MS / 2) {
       const updatedExpiry = Date.now() + ONE_MONTH_IN_MS;
       this.dao.updateSessionToken(token, updatedExpiry);
+      console.log("Updated session.");
     }
     return { user, session };
   }
