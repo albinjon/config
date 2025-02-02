@@ -6,7 +6,8 @@ import { Session, User } from "./auth.ts";
 export class Dao {
   private db: Database;
   constructor() {
-    this.db = new Database("./config.db");
+    const isDev = Deno.env.get("MODE") === "dev";
+    this.db = new Database(isDev ? "./config.db" : "/persistence/config.db");
     initDb(this.db);
   }
 

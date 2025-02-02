@@ -4,10 +4,13 @@
     "hono": "jsr:@hono/hono@^4.6.16"
   },
   "tasks": {
-    "start": "deno run --allow-net main.ts"
+    "watch": "MODE=dev deno run --allow-env --allow-net --allow-read --allow-ffi --watch main.ts"
+    "dev": "MODE=dev deno run --allow-env --allow-net --allow-read --allow-ffi main.ts"
+    "start": "deno run --allow-env --allow-net --allow-read --allow-ffi main.ts"
   },
   "compilerOptions": {
     "jsx": "precompile",
     "jsxImportSource": "hono/jsx"
   }
 }
+
