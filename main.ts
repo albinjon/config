@@ -16,10 +16,13 @@ const auth = new Auth(dao);
 app.use(
   "/api/*",
   cors({
-    origin: ["http://localhost:5556"],
+    origin: [
+      "https://configura-sleek.onrender.com",
+      "https://config.jonfelt.se",
+      "http://localhost:5556",
+    ],
   }),
 );
-
 app.use(
   "/api/config/*",
   bearerAuth({
@@ -33,7 +36,11 @@ app.use(
 app.use(
   "/*",
   csrf({
-    origin: ["http://localhost:5556"],
+    origin: [
+      "https://configura-sleek.onrender.com",
+      "https://config.jonfelt.se",
+      "http://localhost:5556",
+    ],
   }),
 );
 
@@ -51,11 +58,18 @@ app.post("/api/auth", async (c) => {
     password: body.password as string,
   };
   const res = await auth.authenticate(credentials);
-  console.log(res);
   return c.json(res);
 });
 
-app.post("/api/create-user", async (c) => {
+app.get("/api/auth/generate-token", async (c) => {
+  const requestToken = c.req.header("Authorization")?.split(" ").at(-1);
+  const requesterUserId = await auth.getUserId(requestToken!);
+  if (!requesterUserId) throw new Error("No user for token.");
+  const { token } = await auth.createLongLivedToken(requesterUserId);
+  return c.json({ token });
+});
+
+app.post("/api/auth/create-user", async (c) => {
   const body = await c.req.json();
   const credentials: Credentials = {
     username: body.username as string,
@@ -65,30 +79,29 @@ app.post("/api/create-user", async (c) => {
   return c.text("OK");
 });
 
-app.post("/api/delete-user", async (c) => {
-  const body = await c.req.json();
-  const credentials: Credentials = {
-    username: body.username as string,
-    password: body.password as string,
-  };
-  await auth.deleteUser(credentials);
-  return c.text("OK");
+app.get("/api/config/users", (c) => {
+  return c.json(auth.getUsers());
 });
 
-app.get("/api/sessions", (c) => {
-  const res = auth.getSessions();
-  return c.json(res);
+app.post("/api/auth/delete-user", async (c) => {
+  const body = await c.req.json();
+  await auth.deleteUser(body.username as string, body.token as string);
+  return c.text("OK");
 });
 
 app.get("/api/validate/:sessionId", async (c) => {
   const id = c.req.param("sessionId");
   const res = await auth.validate(id);
+  if (!res) {
+    c.status(403);
+  } else {
+    c.status(200);
+  }
   return c.json(res);
 });
 
 app.get("/api/config/all", (c) => {
   const pairs = config.getConfig();
-  console.log(pairs);
   return c.json(pairs);
 });
 
@@ -103,14 +116,12 @@ app.get("/api/config/:key", (c) => {
 
 app.delete("/api/config", async (c) => {
   const body = await c.req.json();
-  console.log(body);
   config.deleteConfig(body.key as string);
 
   c.status(200);
   return c.text("OK");
 });
 
-// TODO: Make sure this is protected
 app.post("/api/config", async (c) => {
   const body = await c.req.json();
   const configPair: ConfigPair = {

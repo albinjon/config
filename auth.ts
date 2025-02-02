@@ -55,29 +55,46 @@ export class Auth {
     return { token };
   }
 
-  public async validate(token: string): Promise<AuthResponse | undefined> {
+  public async createLongLivedToken(
+    requesterUserId: number,
+  ): Promise<TokenResponse> {
+    const token = await this.createSession(requesterUserId, true);
+    return { token };
+  }
+
+  public async getUserSession(
+    token: string,
+  ): Promise<AuthResponse | undefined> {
     const hashedToken = await this.hashSessionToken(token);
     const row = this.dao.getSession(hashedToken);
     if (!row) {
       console.error("Could not find session in table.");
       return;
     }
-    const { user, session } = row;
+    return row;
+  }
+
+  public async validate(token: string): Promise<AuthResponse | undefined> {
+    const result = await this.getUserSession(token);
+    if (!result) return;
+    const { user, session } = result;
     const hasExpired = Date.now() > session.expiryTimestamp;
     if (hasExpired) {
       console.error("Session has expired.");
       return;
     }
     if (session.expiryTimestamp - Date.now() < ONE_MONTH_IN_MS / 2) {
-      console.log("updating token");
       const updatedExpiry = Date.now() + ONE_MONTH_IN_MS;
       this.dao.updateSessionToken(token, updatedExpiry);
     }
     return { user, session };
   }
 
-  public getSessions() {
-    return this.dao.getSessions();
+  public async getUserId(token: string): Promise<number | undefined> {
+    const result = await this.getUserSession(token);
+    if (!result) return;
+    const { user } = result;
+    return user.id;
   }
 
   private async createSession(userId: number, longLived?: boolean) {
@@ -108,12 +125,13 @@ export class Auth {
     this.dao.createUser(username, hash);
   }
 
-  public async deleteUser(credentials: Credentials) {
-    const authResult = await this.authenticate(credentials);
-    if (!authResult) throw new Error("Incorrect credentials.");
-    const validationResult = await this.validate(authResult.token);
-    if (!validationResult) throw new Error("Invalid user or token.");
-    const userId = validationResult.user.id;
-    return this.dao.deleteUser(userId);
+  public getUsers() {
+    return this.dao.getUsers();
+  }
+
+  public async deleteUser(username: string, token: string) {
+    const isValid = await this.validate(token);
+    if (!isValid) throw new Error("Invalid user or token.");
+    return this.dao.deleteUser(username);
   }
 }

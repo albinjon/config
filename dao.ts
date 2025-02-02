@@ -6,7 +6,7 @@ import { Session, User } from "./auth.ts";
 export class Dao {
   private db: Database;
   constructor() {
-    this.db = new Database("config.db");
+    this.db = new Database("./config.db");
     initDb(this.db);
   }
 
@@ -79,8 +79,12 @@ export class Dao {
       }>(username);
   }
 
-  public deleteUser(userId: number) {
-    return this.db.prepare(`DELETE FROM user WHERE id = ?`).run(userId);
+  public getUsers() {
+    return this.db.prepare("SELECT id, username FROM user").all();
+  }
+
+  public deleteUser(username: string) {
+    return this.db.prepare(`DELETE FROM user WHERE username = ?`).run(username);
   }
 
   public setConfig(key: string, value: string) {
